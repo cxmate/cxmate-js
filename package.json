@@ -1,0 +1,26 @@
+{
+  "name": "cxmate",
+  "version": "0.1.0",
+  "description": "SDK for creating cxMate services",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cxmate/cxmate-js.git"
+  },
+  "keywords": [
+    "cytoscape",
+    "networkx",
+    "network",
+    "biology",
+    "cxmate"
+  ],
+  "author": "Eric Sage",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cxmate/cxmate-js/issues"
+  },
+  "homepage": "https://github.com/cxmate/cxmate-js#readme"
+}
