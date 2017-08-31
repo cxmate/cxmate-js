@@ -31,6 +31,7 @@
     "flow-bin": "^0.53.1"
   },
   "dependencies": {
+    "cytoscape": "^3.2.1",
     "grpc": "^1.4.1"
   }
 }
