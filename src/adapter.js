@@ -1,63 +1,78 @@
 let cytoscape = require('cytoscape');
 
 class Adapter {
-  static fromCyJS(model, callback) {
-    let cy = cytoscape(model);
-    for (let node of cy.elements('node').toArray()) {
-      let id = this.stripId(node.data().id);
-      let data = node.data();
-      callback({
-        label: 'Output',
-        element: 'node',
-        node: {
-          id: id,
-          name: data.name,
-          represents: data.represents,
-        },
-      });
-      delete data.id;
-      delete data.name;
-      delete data.represents;
-      for (let nodeAttr in data) {
-        let type = typeof data[nodeAttr];
+  static fromCyJS(models, callback) {
+    for (let model of models) {
+      const label = model.data.label
+      let cy = cytoscape(model);
+      for (let node of cy.elements('node').toArray()) {
+        let id = this.stripId(node.data().id);
+        let data = node.data();
         callback({
-          label: 'Output',
-          element: 'nodeAttribute',
-          nodeAttribute: {
-            nodeId: id,
-            name: nodeAttr,
-            value: data[nodeAttr].toString(),
-            type: type,
+          label: label,
+          element: 'node',
+          node: {
+            id: id,
+            name: data.name,
+            represents: data.represents,
           },
         });
+        delete data.id;
+        delete data.name;
+        delete data.represents;
+        for (let nodeAttr in data) {
+          let type = typeof data[nodeAttr];
+          callback({
+            label: label,
+            element: 'nodeAttribute',
+            nodeAttribute: {
+              nodeId: id,
+              name: nodeAttr,
+              value: data[nodeAttr].toString(),
+              type: type,
+            },
+          });
+        }
       }
-    }
-    for (let edge of cy.elements('edge').toArray()) {
-      let id = this.stripId(edge.data().id);
-      let data = edge.data();
-      callback({
-        label: 'Output',
-        element: 'edge',
-        edge: {
-          id: id,
-          sourceId: this.stripId(data.source),
-          targetId: this.stripId(data.target),
-          interaction: data.interaction,
-        },
-      });
-      delete data.id;
-      delete data.source;
-      delete data.target;
-      delete data.interaction;
-      for (let edgeAttr in data) {
-        let type = typeof data[edgeAttr];
+      for (let edge of cy.elements('edge').toArray()) {
+        let id = this.stripId(edge.data().id);
+        let data = edge.data();
         callback({
-          label: 'Output',
-          element: 'edgeAttribute',
-          edgeAttribute: {
-            edgeId: id,
-            name: edgeAttr,
-            value: data[edgeAttr].toString(),
+          label: label,
+          element: 'edge',
+          edge: {
+            id: id,
+            sourceId: this.stripId(data.source),
+            targetId: this.stripId(data.target),
+            interaction: data.interaction,
+          },
+        });
+        delete data.id;
+        delete data.source;
+        delete data.target;
+        delete data.interaction;
+        for (let edgeAttr in data) {
+          let type = typeof data[edgeAttr];
+          callback({
+            label: label,
+            element: 'edgeAttribute',
+            edgeAttribute: {
+              edgeId: id,
+              name: edgeAttr,
+              value: data[edgeAttr].toString(),
+              type: type,
+            },
+          });
+        }
+      }
+      for (let networkAttr in model.data) {
+        let type = typeof model.data[networkAttr];
+        callback({
+          label: label,
+          element: 'networkAttribute',
+          networkAttribute: {
+            name: networkAttr,
+            value: model.data[networkAttr].toString(),
             type: type,
           },
         });
@@ -66,14 +81,21 @@ class Adapter {
   }
 
   static toCyJS(inputStream, callback) {
-    let data = {};
-    let nodes = {};
-    let edges = {};
+    let networks = {};
     inputStream.on('data', (networkElement) => {
+      let label = networkElement.label;
+      if (!(label in networks)) {
+        networks[label] = {
+          data: {},
+          nodes: {},
+          edges: {},
+        };
+      }
+      let network = networks[label];
       switch (networkElement.element) {
         case 'node': {
           let node = networkElement.node;
-          nodes[node.id] = {
+          network.nodes[node.id] = {
             group: 'nodes',
             data: {
               id: this.convertId('node', node.id),
@@ -85,7 +107,7 @@ class Adapter {
         }
         case 'edge': {
           let edge = networkElement.edge;
-          edges[edge.id] = {
+          network.edges[edge.id] = {
             group: 'edges',
             data: {
               id: this.convertId('edge', edge.id),
@@ -99,10 +121,10 @@ class Adapter {
         case 'nodeAttribute': {
           let nodeAttr = networkElement.nodeAttribute;
           let value = this.castAttribute(nodeAttr.value, nodeAttr.type);
-          if (nodeAttr.nodeId in nodes) {
-            nodes[nodeAttr.nodeId].data[nodeAttr.name] = value;
+          if (nodeAttr.nodeId in network.nodes) {
+            network.nodes[nodeAttr.nodeId].data[nodeAttr.name] = value;
           } else {
-            nodes[nodeAttr.nodeId] = {
+            network.nodes[nodeAttr.nodeId] = {
               group: 'nodes',
               data: {
                 id: this.convertId('node', nodeAttr.nodeId),
@@ -115,10 +137,10 @@ class Adapter {
         case 'edgeAttribute': {
           let edgeAttr = networkElement.edgeAttribute;
           let value = this.castAttribute(edgeAttr.value, edgeAttr.type);
-          if (edgeAttr.edgeId in edges) {
-            edges[edgeAttr.edgeId].data[edgeAttr.name] = value;
+          if (edgeAttr.edgeId in network.edges) {
+            network.edges[edgeAttr.edgeId].data[edgeAttr.name] = value;
           } else {
-            edges[edgeAttr.edgeId] = {
+            network.edges[edgeAttr.edgeId] = {
               group: 'edges',
               data: {
                 id: this.convertId('edge', edgeAttr.edgeId),
@@ -131,18 +153,23 @@ class Adapter {
         case 'networkAttribute': {
           let networkAttr = networkElement.networkAttribute;
           let value = this.castAttribute(networkAttr.value, networkAttr.type);
-          data[networkAttr.name] = value;
+          network.data[networkAttr.name] = value;
           break;
         }
       }
     });
     inputStream.on('end', () => {
-      let nodeList = Object.keys(nodes).map((key) => nodes[key]);
-      let edgeList = Object.keys(edges).map((key) => edges[key]);
-      callback({
-        elements: [...nodeList, ...edgeList],
-        data,
+      let networkList = Object.keys(networks).map((label) => {
+        let network = networks[label];
+        let nodeList = Object.keys(network.nodes).map((key) => network.nodes[key]);
+        let edgeList = Object.keys(network.edges).map((key) => network.edges[key]);
+        network.data['label'] = label;
+        return {
+          elements: [...nodeList, ...edgeList],
+          data: network.data,
+        };
       });
+      callback(networkList);
     });
   }
 
